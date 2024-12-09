@@ -75,6 +75,22 @@ def train_model(model, trainloader, optimizer, privacy_engine, epochs):
                 print(f"[{epoch + 1}, {i + 1}] loss: {running_loss / 100:.3f}")
                 running_loss = 0.0
     print("Finished Training")
+    
+def evaluate_train_set(model, trainloader):
+    model.eval()  # Set model to evaluation mode
+    correct = 0
+    total = 0
+    with torch.no_grad():  # Disable gradient computations for evaluation
+        for inputs, labels in trainloader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+            _, predicted = torch.max(outputs, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    accuracy = 100 * correct / total
+    print(f"Accuracy on training set: {accuracy:.2f}%")
+    return accuracy
 
 # 4. Test the model
 def test_model(model, testloader):
@@ -91,7 +107,8 @@ def test_model(model, testloader):
 
     accuracy = 100 * correct / total
     print(f"Accuracy on test set: {accuracy:.2f}%")
-
+    return accuracy
+    
 # 5. Main entry point
 if __name__ == '__main__':
     trainloader, testloader = get_data_loaders()
@@ -130,4 +147,7 @@ if __name__ == '__main__':
     end_train = time.time()
 
     print(f"Training completed in {end_train - start_train:.2f} seconds")
-    test_model(model, testloader)  # Test the model
+    train_accuracy = evaluate_train_set(model, trainloader)  
+    test_accuracy =test_model(model, testloader)  # Test the model
+    
+    print(f"Train-Test Accuracy Gap: {train_accuracy - test_accuracy:.2f}%")

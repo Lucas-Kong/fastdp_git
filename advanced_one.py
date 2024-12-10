@@ -143,6 +143,8 @@ def train_model():
     print(f"time_gaussian: {config.global_gaussian}, time_clipping: {config.global_clipping}")
     print(f"count_gaussian: {config.count_gaussian}, count_clipping: {config.count_clipping}") 
     print(f"count_total_gaussian: {config.count_total_gaussian}, count_total_clipping: {config.count_total_clipping}")
+    print(f"List of shape = {config.shape_list}")
+    print(f"List of std = {config.std_list[0]}")
     #clipping_gaussian_time()
 
 def clipping_gaussian_time():

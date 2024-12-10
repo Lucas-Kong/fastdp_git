@@ -178,5 +178,5 @@ if __name__ == '__main__':
     print(f"Training completed in {end_train - start_train:.2f} seconds")
     train_accuracy = evaluate_train_set(model, trainloader)  
     test_accuracy =test_model(model, testloader)  # Test the model
-    
+    print(f"time_gaussian: {config.global_gaussian}, time_clipping: {config.global_clipping}")
     print(f"Train-Test Accuracy Gap: {train_accuracy - test_accuracy:.2f}%")

@@ -95,6 +95,8 @@ def train_model():
     config.count_clipping = 0
     config.count_total_gaussian = 0
     config.count_total_clipping = 0
+    config.shape_list = []
+    config.std_list = []
     # 3. Define optimizer and privacy engine
     optimizer = optim.SGD(model.parameters(), lr=0.05)
     privacy_engine = PrivacyEngine(

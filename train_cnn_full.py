@@ -133,7 +133,7 @@ if __name__ == '__main__':
         model,
         batch_size=256,
         sample_size=len(trainloader.dataset),
-        epochs=10,  # Training for 10 epochs
+        epochs=100,  # Training for 10 epochs
         target_epsilon=2,
         clipping_fn='automatic',
         clipping_mode='MixOpt',
@@ -143,7 +143,7 @@ if __name__ == '__main__':
     )
 
     start_train = time.time()
-    train_model(model, trainloader, optimizer, privacy_engine, epochs=10)  # Train for 10 epochs
+    train_model(model, trainloader, optimizer, privacy_engine, epochs=100)  # Train for 10 epochs
     end_train = time.time()
 
     print(f"Training completed in {end_train - start_train:.2f} seconds")

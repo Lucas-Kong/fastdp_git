@@ -3,72 +3,30 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import torchvision
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms
-from fastDP import PrivacyEngine
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
+from fastDP import PrivacyEngine  # Ensure fastDP is installed and available
 import time
-import multiprocessing
 import config
 from decimal import Decimal
+# Check if CUDA is available and determine GPU count
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+num_gpus = torch.cuda.device_count()
+print(f"Using {num_gpus} GPU(s)")
 
-# Data augmentation with explicit resizing
-train_transform = transforms.Compose([
-    transforms.Resize((32, 32)),  # Ensure all images are resized to 32x32
-    transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
-    transforms.RandomPerspective(distortion_scale=0.5, p=0.5),
-    transforms.RandomHorizontalFlip(p=0.5),
-    transforms.ToTensor(),
-])
+# 1. Load CIFAR-10 dataset
+def get_data_loaders():
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))  # CIFAR-10 normalization
+    ])
+    trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+    testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
 
-test_transform = transforms.Compose([
-    transforms.Resize((32, 32)),  # Ensure test images are resized to 32x32
-    transforms.ToTensor(),
-])
+    trainloader = DataLoader(trainset, batch_size=256, shuffle=True, num_workers=4)  # Adjust num_workers
+    testloader = DataLoader(testset, batch_size=256, shuffle=False, num_workers=4)
+    return trainloader, testloader
 
-
-# Custom Dataset class
-class CIFAR10_dataset(Dataset):
-    def __init__(self, partition="train", transform=None):
-        print("\nLoading CIFAR10", partition, "Dataset...")
-        self.partition = partition
-        self.transform = transform
-        if self.partition == "train":
-            self.data = torchvision.datasets.CIFAR10(root = './data', train=True, download=True)
-        else:
-            self.data = torchvision.datasets.CIFAR10(root = './data', train=False, download=True)
-        print("\tTotal Len.:", len(self.data), "\n", 50 * "-")
-
-    def from_pil_to_tensor(self, image):
-        return torchvision.transforms.ToTensor()(image)
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        # Image
-        image = self.data[idx][0]
-        image_tensor = self.transform(image)
-
-        # Label
-        label = torch.tensor(self.data[idx][1])
-        label = F.one_hot(label, num_classes=10).float()  # One-hot encoding of the label
-
-        return {"img": image_tensor, "label": label}
-
-# Load datasets with augmentation for training and no augmentation for testing
-train_dataset = CIFAR10_dataset(partition="train", transform=train_transform)
-test_dataset = CIFAR10_dataset(partition="test", transform=test_transform)
-
-# Set batch size and number of workers for data loading
-batch_size = 100
-num_workers = multiprocessing.cpu_count() - 1
-print("Num workers:", num_workers)
-
-train_dataloader = DataLoader(train_dataset, batch_size, shuffle=True, num_workers=num_workers)
-test_dataloader = DataLoader(test_dataset, batch_size, shuffle=False, num_workers=num_workers)
-
-# Define Advanced CNN Model (already provided)
 class AdvancedCNN(nn.Module):
     def __init__(self, num_classes=10):
         super(AdvancedCNN, self).__init__()
@@ -182,16 +140,14 @@ def test_model(model, testloader):
     
 # 5. Main entry point
 if __name__ == '__main__':
-    trainloader, testloader = train_dataloader, test_dataloader
+    trainloader, testloader = get_data_loaders()
     model = AdvancedCNN()
 
     # Parallelize model across GPUs
-    if torch.cuda.device_count() > 1:
+    if num_gpus > 1:
         print("GPU being used.")
         model = nn.DataParallel(model)
     model = model.to(device)
-    
-    # Reset configuration values
     config.global_gaussian = Decimal(0)
     config.global_clipping = Decimal(0)
     config.count_gaussian = 0
@@ -200,14 +156,13 @@ if __name__ == '__main__':
     config.count_total_clipping = 0
     config.shape_list = []
     config.std_list = []
-    
     # Define optimizer and PrivacyEngine
     optimizer = optim.SGD(model.parameters(), lr=0.05)
     privacy_engine = PrivacyEngine(
         model,
         batch_size=256,
         sample_size=len(trainloader.dataset),
-        epochs=10,  # Training for 10 epochs
+        epochs=100,  # Training for 100 epochs
         target_epsilon=2,
         clipping_fn='automatic',
         clipping_mode='MixOpt',
@@ -216,18 +171,12 @@ if __name__ == '__main__':
         clipping_value=1.0
     )
 
-    # Start training
     start_train = time.time()
-    train_model(model, trainloader, optimizer, privacy_engine, epochs=10)  # Train for 10 epochs
+    train_model(model, trainloader, optimizer, privacy_engine, epochs=100)  # Train for 10 epochs
     end_train = time.time()
 
     print(f"Training completed in {end_train - start_train:.2f} seconds")
-    
-    # Evaluate model on the training set
     train_accuracy = evaluate_train_set(model, trainloader)  
+    test_accuracy =test_model(model, testloader)  # Test the model
     
-    # Evaluate model on the test set
-    test_accuracy = test_model(model, testloader)  
-    
-    # Print the train-test accuracy gap
     print(f"Train-Test Accuracy Gap: {train_accuracy - test_accuracy:.2f}%")
